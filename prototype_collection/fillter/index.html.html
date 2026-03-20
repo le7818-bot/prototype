@@ -1,0 +1,920 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>팔로워 스티커 시스템 UI 제안 - 필터 적용</title>
+    <style>
+        :root {
+            --primary-color: #8b95f2;
+            --bg-color: #f4f5f9;
+            --panel-bg: #ffffff;
+            --border-color: #e0e0e0;
+            
+            /* 필터 관련 스타레일풍 색상 */
+            --sr-dark-bg: #1a1a1f;
+            --sr-dark-panel: #24242b;
+            --sr-text-light: #dcdcdc;
+            --sr-text-dim: #888;
+            --sr-accent: #dca061; /* 주황/골드 포인트 */
+            --sr-light-modal: #e8e8e8;
+            --sr-btn-light: #f0f0f0;
+        }
+        
+        * { box-sizing: border-box; }
+
+        body {
+            font-family: 'Pretendard', sans-serif;
+            background-color: #333;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            overflow: hidden;
+        }
+        
+        /* 게임 화면 컨테이너 */
+        .game-container {
+            width: 900px;
+            height: 600px;
+            background-color: var(--bg-color);
+            border-radius: 12px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            display: flex;
+            flex-direction: row;
+            overflow: hidden;
+            position: relative;
+        }
+
+        /* 좌측 섹션 (캔버스 + 스티커 하단) */
+        .left-section {
+            flex: 3;
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+        }
+
+        /* 상단: 캔버스 영역 */
+        .top-section {
+            display: flex;
+            height: 55%;
+            padding: 15px;
+        }
+        .canvas-area {
+            flex: 1;
+            background-color: var(--panel-bg);
+            border: 2px dashed var(--primary-color);
+            border-radius: 8px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-weight: bold;
+            color: var(--primary-color);
+            font-size: 1.2rem;
+        }
+
+        /* 우측: 레이어 영역 (전체 높이) */
+        .layer-area {
+            flex: 1;
+            background-color: var(--panel-bg);
+            border-left: 1px solid var(--border-color);
+            padding: 15px;
+            overflow-y: auto;
+            height: 100%;
+        }
+        .layer-item {
+            background: #f0f0f0;
+            padding: 8px;
+            margin-bottom: 5px;
+            border-radius: 4px;
+            font-size: 0.85rem;
+            text-align: center;
+        }
+
+        /* 하단: 애셋 리스트 영역 */
+        .bottom-section {
+            height: 45%;
+            background-color: var(--panel-bg);
+            border-top: 1px solid var(--border-color);
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* 필터 헤더 바 */
+        .toolbar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 15px;
+            border-bottom: 1px solid var(--border-color);
+            background-color: #fafafa;
+        }
+        .sort-dropdown {
+            padding: 6px 10px;
+            border-radius: 4px;
+            border: 1px solid var(--border-color);
+            font-size: 0.9rem;
+        }
+        .filter-controls {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .filter-status {
+            color: var(--sr-accent);
+            font-size: 0.85rem;
+            font-weight: bold;
+            display: none;
+        }
+        .filter-status.active {
+            display: block;
+            animation: pulse 2s infinite;
+        }
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+        .btn-filter {
+            background-color: #444;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 0.9rem;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            transition: 0.2s;
+        }
+        .btn-filter:hover { background-color: #222; }
+
+        /* 스티커 그리드 */
+        .sticker-grid {
+            flex: 1;
+            padding: 15px;
+            overflow-y: auto;
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(65px, 1fr));
+            gap: 10px;
+            align-content: start;
+        }
+        .sticker-item {
+            aspect-ratio: 1;
+            border-radius: 8px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 0.75rem;
+            text-align: center;
+            word-break: keep-all;
+            cursor: pointer;
+            position: relative;
+            background-color: #e8eaf6;
+            border: 1px solid var(--primary-color);
+            color: var(--primary-color);
+            padding: 5px;
+        }
+        .sticker-item.locked {
+            background-color: #eee;
+            color: #999;
+            border: 1px solid #ccc;
+            filter: grayscale(100%) opacity(0.6); 
+        }
+        .locked-icon {
+            position: absolute;
+            bottom: 2px;
+            right: 2px;
+            font-size: 0.7rem;
+        }
+        .empty-message {
+            grid-column: 1 / -1;
+            text-align: center;
+            padding: 50px 20px;
+            color: #888;
+            font-size: 1.1rem;
+            font-weight: bold;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background-color: transparent;
+            border: none;
+        }
+
+        /* 필터 사이드 패널 */
+        .filter-panel {
+            position: absolute;
+            top: 0;
+            right: -320px;
+            width: 300px;
+            height: 100%;
+            background-color: var(--sr-dark-bg);
+            color: var(--sr-text-light);
+            transition: right 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+            display: flex;
+            flex-direction: column;
+            box-shadow: -5px 0 20px rgba(0,0,0,0.5);
+            z-index: 10;
+            border-left: 1px solid #333;
+        }
+        .filter-panel.open { right: 0; }
+        .panel-header {
+            padding: 15px 20px;
+            font-size: 1.1rem;
+            font-weight: bold;
+            border-bottom: 1px solid #333;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .btn-close-panel {
+            background: none; border: none; color: #888;
+            font-size: 1.5rem; cursor: pointer;
+        }
+        .panel-body {
+            flex: 1; padding: 20px; overflow-y: auto;
+            display: flex; flex-direction: column; gap: 25px;
+        }
+        .filter-section-title {
+            font-size: 0.85rem; color: var(--sr-text-dim); margin-bottom: 10px;
+        }
+
+        .toggle-group { display: flex; gap: 10px; }
+        .btn-toggle {
+            flex: 1; background-color: var(--sr-dark-panel);
+            border: 1px solid #444; color: #aaa; padding: 10px;
+            border-radius: 20px; cursor: pointer; font-size: 0.9rem; transition: 0.2s;
+        }
+        .btn-toggle.active {
+            background-color: #fff; color: #111; font-weight: bold; border-color: #fff;
+        }
+
+        .click-to-select {
+            background-color: #ddd; color: #111; padding: 12px 15px;
+            border-radius: 4px; display: flex; justify-content: space-between;
+            align-items: center; cursor: pointer; font-weight: bold; font-size: 0.95rem;
+        }
+        .click-to-select:hover { background-color: #eee; }
+        .plus-icon { font-size: 1.2rem; }
+
+        .selected-list {
+            margin-top: 10px; display: flex; flex-direction: column; gap: 8px;
+        }
+        .char-chip {
+            background-color: rgba(0,0,0,0.4); border: 1px solid #444;
+            border-radius: 4px; padding: 8px 12px; display: flex;
+            justify-content: space-between; align-items: center; font-size: 0.9rem;
+        }
+        .char-chip-left { display: flex; align-items: center; gap: 10px; }
+        .chip-avatar {
+            width: 20px; height: 20px; background-color: #555;
+            border-radius: 50%; display: flex; justify-content: center;
+            align-items: center; font-size: 0.6rem;
+        }
+        .btn-remove-chip {
+            color: #ff4d4f; background: none; border: none;
+            cursor: pointer; font-weight: bold; font-size: 1rem; padding: 0 5px;
+        }
+
+        .exclude-toggle-wrapper {
+            margin-top: 15px; display: flex; justify-content: space-between;
+            align-items: center; background-color: rgba(0,0,0,0.2);
+            padding: 10px 15px; border-radius: 4px; border: 1px solid #444;
+        }
+        .exclude-label { font-size: 0.9rem; color: var(--sr-text-light); }
+        .toggle-switch { position: relative; display: inline-block; width: 40px; height: 22px; }
+        .toggle-switch input { opacity: 0; width: 0; height: 0; }
+        .toggle-slider {
+            position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0;
+            background-color: #555; transition: .2s; border-radius: 22px;
+        }
+        .toggle-slider:before {
+            position: absolute; content: ""; height: 16px; width: 16px;
+            left: 3px; bottom: 3px; background-color: white; transition: .2s; border-radius: 50%;
+        }
+        input:checked + .toggle-slider { background-color: var(--sr-accent); }
+        input:checked + .toggle-slider:before { transform: translateX(18px); }
+
+        .panel-footer {
+            padding: 15px 20px; border-top: 1px solid #333; display: flex; gap: 10px;
+        }
+        .btn-pill {
+            flex: 1; padding: 12px; border-radius: 25px; border: none;
+            font-size: 0.95rem; font-weight: bold; cursor: pointer;
+            display: flex; justify-content: center; align-items: center; gap: 5px;
+        }
+        .btn-reset { background-color: #333; color: #aaa; }
+        .btn-apply { background-color: var(--sr-btn-light); color: #111; }
+
+        /* 캐릭터 선택 모달 */
+        .modal-overlay {
+            position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+            background-color: rgba(0,0,0,0.6); display: flex;
+            justify-content: center; align-items: center;
+            z-index: 20; opacity: 0; pointer-events: none; transition: opacity 0.2s;
+        }
+        .modal-overlay.open { opacity: 1; pointer-events: auto; }
+        .modal-content {
+            background-color: var(--sr-light-modal); width: 600px; height: 580px; /* 세로 크기 소폭 증가 */
+            border-radius: 12px; display: flex; flex-direction: column;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.3); overflow: hidden;
+        }
+        .modal-header {
+            padding: 15px 20px; border-bottom: 1px solid #ccc;
+            display: flex; justify-content: space-between; align-items: center;
+        }
+        .modal-header h3 { margin: 0; font-size: 1.1rem; color: #111; }
+        
+        .modal-body {
+            flex: 1; padding: 20px; overflow-y: auto; background-color: #dfdfdf;
+        }
+        
+        /* 모달 내부 캐릭터 필터링 UI */
+        .modal-view-filters {
+            background: #fff;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 15px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+        .view-filter-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .view-filter-label {
+            font-size: 0.85rem;
+            font-weight: bold;
+            color: #555;
+            width: 70px;
+        }
+        .view-filter-options {
+            display: flex;
+            gap: 6px;
+            flex-wrap: wrap;
+            flex: 1;
+        }
+        .btn-view-filter {
+            background-color: #f0f0f0;
+            border: 1px solid #ddd;
+            border-radius: 15px;
+            padding: 6px 12px;
+            font-size: 0.8rem;
+            cursor: pointer;
+            color: #555;
+            transition: 0.2s;
+        }
+        .btn-view-filter:hover { background-color: #e4e4e4; }
+        .btn-view-filter.active {
+            background-color: var(--sr-accent);
+            color: #fff;
+            border-color: var(--sr-accent);
+            font-weight: bold;
+        }
+
+        /* 원소 색상 버튼 스타일 */
+        .btn-color-filter {
+            width: 30px; height: 30px; border-radius: 50%; border: 2px solid transparent; 
+            cursor: pointer; transition: 0.2s; position: relative;
+            display: flex; justify-content: center; align-items: center;
+            color: white; font-size: 0.9rem; font-weight: bold;
+        }
+        .btn-color-filter:hover { opacity: 0.8; }
+        .btn-color-filter.active {
+            border-color: #333; transform: scale(1.1); box-shadow: 0 0 5px rgba(0,0,0,0.3);
+        }
+        .btn-color-filter.active::after { content: '✓'; } /* 활성화 시 체크마크 표시 */
+        
+        /* 5가지 색상 매핑 */
+        .bg-red { background-color: #ff4d4f; }
+        .bg-blue { background-color: #4096ff; }
+        .bg-green { background-color: #73d13d; }
+        .bg-yellow { background-color: #ffec3d; color: #333; } /* 노란색은 체크마크가 잘 보이도록 검정색으로 */
+        .bg-purple { background-color: #9254de; }
+
+        /* 캐릭터 100명 그리드 */
+        .char-grid {
+            display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px;
+        }
+        .char-item {
+            background-color: #fff; padding: 10px 15px; border-radius: 4px;
+            display: flex; align-items: center; gap: 12px; cursor: pointer;
+            border: 1px solid transparent; box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        }
+        .char-item:hover { border-color: #bbb; }
+        .char-item-avatar {
+            width: 38px; height: 38px; background-color: #eee; border-radius: 4px;
+            display: flex; justify-content: center; align-items: center;
+            font-size: 0.7rem; color: #999; flex-shrink: 0;
+        }
+        .char-info { flex: 1; display: flex; flex-direction: column; gap: 3px; }
+        .char-item-name { font-size: 0.9rem; font-weight: bold; color: #333; }
+        .char-item-tags { font-size: 0.75rem; color: #888; }
+        
+        .custom-checkbox {
+            width: 20px; height: 20px; background-color: #eee; border: 1px solid #ccc;
+            border-radius: 2px; display: flex; justify-content: center; align-items: center;
+            color: transparent; font-size: 0.9rem; font-weight: bold; flex-shrink: 0;
+        }
+        .char-item.selected .custom-checkbox {
+            background-color: #fff; border-color: var(--sr-accent); color: var(--sr-accent);
+        }
+
+        .modal-footer {
+            padding: 15px 20px; background-color: #1a1a1f; display: flex;
+            justify-content: center; gap: 20px;
+        }
+        .btn-modal-action {
+            width: 180px; padding: 12px; border-radius: 25px; border: none;
+            font-size: 1rem; font-weight: bold; cursor: pointer;
+            display: flex; justify-content: center; align-items: center; gap: 8px;
+        }
+        .btn-modal-clear { background-color: #ddd; color: #333; }
+        .btn-modal-confirm { background-color: #eee; color: #111; }
+        
+        /* 모달 빈 검색결과 */
+        .modal-empty {
+            grid-column: 1 / -1;
+            text-align: center;
+            padding: 40px;
+            color: #888;
+        }
+
+    </style>
+</head>
+<body>
+
+<div class="game-container">
+    <div class="left-section">
+        <!-- 상단: 캔버스 영역 -->
+        <div class="top-section">
+            <div class="canvas-area">배너 캔버스 영역</div>
+        </div>
+
+        <!-- 하단: 애셋 및 툴바 -->
+        <div class="bottom-section">
+            <div class="toolbar">
+                <select class="sort-dropdown">
+                    <option>최신 획득순</option>
+                    <option>등급순</option>
+                </select>
+                <div class="filter-controls">
+                    <span id="filter-status" class="filter-status">필터링 중</span>
+                    <button id="btn-open-filter" class="btn-filter">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon></svg>
+                        필터
+                    </button>
+                </div>
+            </div>
+
+            <div class="sticker-grid" id="sticker-grid">
+                <!-- JS로 전체 데이터가 동적으로 채워집니다 -->
+            </div>
+        </div>
+    </div>
+
+    <!-- 우측: 레이어 영역 -->
+    <div class="layer-area">
+        <div style="font-weight:bold; margin-bottom:10px;">레이어 (3/10)</div>
+        <div class="layer-item">스티커: (1)-스마일</div>
+        <div class="layer-item">스티커: 이펙트_반짝임</div>
+        <div class="layer-item">배경: 루키 기본 배경</div>
+    </div>
+
+    <!-- 1. 사이드 필터 패널 -->
+    <div id="filter-panel" class="filter-panel">
+        <div class="panel-header">
+            필터링 규칙
+            <button id="btn-close-panel" class="btn-close-panel">×</button>
+        </div>
+        <div class="panel-body">
+            
+            <div class="filter-section">
+                <div class="filter-section-title">보유 여부</div>
+                <div class="toggle-group">
+                    <button class="btn-toggle" data-val="owned">보유</button>
+                    <button class="btn-toggle" data-val="unowned">미보유</button>
+                </div>
+            </div>
+
+            <div class="filter-section">
+                <div class="filter-section-title">팔로워 스티커</div>
+                <div id="btn-select-char" class="click-to-select">
+                    클릭해 선택 <span class="plus-icon">+</span>
+                </div>
+                
+                <!-- 선택된 캐릭터들이 렌더링될 컨테이너 -->
+                <div id="selected-chips-container" class="selected-list"></div>
+
+                <!-- 캐릭터 제외 토글 -->
+                <div class="exclude-toggle-wrapper">
+                    <span class="exclude-label">팔로워 스티커 제외</span>
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="toggle-exclude">
+                        <span class="toggle-slider"></span>
+                    </label>
+                </div>
+            </div>
+
+        </div>
+        <div class="panel-footer">
+            <button id="btn-reset" class="btn-pill btn-reset">↺ 초기화</button>
+            <button id="btn-apply" class="btn-pill btn-apply">적용</button>
+        </div>
+    </div>
+
+    <!-- 2. 캐릭터 선택 모달 -->
+    <div id="char-modal" class="modal-overlay">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>팔로워 스티커</h3>
+                <button id="btn-close-modal" class="btn-close-panel">×</button>
+            </div>
+            <div class="modal-body">
+                <!-- 모달 내부의 새로운 검색 필터 (원소, 클래스, 태생등급) -->
+                <div class="modal-view-filters">
+                    <div class="view-filter-row">
+                        <div class="view-filter-label">원소 속성</div>
+                        <div class="view-filter-options">
+                            <!-- 텍스트 대신 색상 원형 버튼 적용 -->
+                            <button class="btn-color-filter filter-trigger bg-red" data-type="element" data-val="화염" title="화염(빨강)"></button>
+                            <button class="btn-color-filter filter-trigger bg-blue" data-type="element" data-val="얼음" title="얼음(파랑)"></button>
+                            <button class="btn-color-filter filter-trigger bg-green" data-type="element" data-val="바람" title="바람(초록)"></button>
+                            <button class="btn-color-filter filter-trigger bg-yellow" data-type="element" data-val="번개" title="번개(노랑)"></button>
+                            <button class="btn-color-filter filter-trigger bg-purple" data-type="element" data-val="양자" title="양자(보라)"></button>
+                        </div>
+                    </div>
+                    <div class="view-filter-row">
+                        <div class="view-filter-label">클래스</div>
+                        <div class="view-filter-options">
+                            <button class="btn-view-filter filter-trigger" data-type="class" data-val="탱커">🛡️ 탱커</button>
+                            <button class="btn-view-filter filter-trigger" data-type="class" data-val="딜러">⚔️ 근거리</button>
+                            <button class="btn-view-filter filter-trigger" data-type="class" data-val="딜러">🏹 원거리</button>
+                            <button class="btn-view-filter filter-trigger" data-type="class" data-val="서포터">🪄 서포터</button>
+                            <button class="btn-view-filter filter-trigger" data-type="class" data-val="힐러">💖 힐러</button>
+                        </div>
+                    </div>
+                    <div class="view-filter-row">
+                        <div class="view-filter-label">태생 등급</div>
+                        <div class="view-filter-options">
+                            <button class="btn-view-filter filter-trigger" data-type="rarity" data-val="4">1성</button>
+                            <button class="btn-view-filter filter-trigger" data-type="rarity" data-val="5">2성</button>
+                            <button class="btn-view-filter filter-trigger" data-type="rarity" data-val="5">3성</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="char-grid" id="char-grid">
+                    <!-- JS로 100명의 캐릭터 자동 생성 -->
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button id="btn-modal-clear" class="btn-modal-action btn-modal-clear">⊗ 모두 해제</button>
+                <button id="btn-modal-confirm" class="btn-modal-action btn-modal-confirm">✓ 확인</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // ==========================================
+    // 1. 대규모 데이터 생성 로직 (속성/등급/클래스 추가)
+    // ==========================================
+    const elementTypes = ['화염', '얼음', '바람', '번개', '양자']; // 5색상에 맞춤
+    const classTypes = ['탱커', '딜러', '서포터', '힐러']; // 클래스 종류
+    const rarityTypes = [4, 5];
+
+    // 캐릭터 100종 생성 (이름: 1 ~ 100, 속성/클래스/등급 부여)
+    const characters = Array.from({length: 100}, (_, i) => ({
+        id: i + 1,
+        name: `${i + 1}`,
+        element: elementTypes[i % elementTypes.length],
+        charClass: classTypes[i % classTypes.length],
+        rarity: rarityTypes[i % 2]
+    }));
+
+    const allStickers = [];
+
+    // [캐릭터 스티커] 각 20종씩 (총 2000개)
+    characters.forEach(char => {
+        for(let i = 1; i <= 20; i++) {
+            allStickers.push({
+                id: `char_${char.id}_${i}`,
+                type: 'character',
+                charId: char.id,
+                text: `(${char.id})-${i}`,
+                isOwned: Math.random() > 0.5 
+            });
+        }
+    });
+
+    // [기타 스티커] 랭킹 3종
+    for(let i = 1; i <= 3; i++) {
+        allStickers.push({ id: `rank_${i}`, type: 'other', text: `랭킹(${i})`, isOwned: Math.random() > 0.5 });
+    }
+    // [기타 스티커] 이벤트 5종
+    for(let i = 1; i <= 5; i++) {
+        allStickers.push({ id: `event_${i}`, type: 'other', text: `이벤트${i}`, isOwned: Math.random() > 0.5 });
+    }
+    // [기타 스티커] 꾸밈 10종
+    for(let i = 1; i <= 10; i++) {
+        allStickers.push({ id: `deco_${i}`, type: 'other', text: `꾸밈${i}`, isOwned: Math.random() > 0.5 });
+    }
+
+    // ==========================================
+    // 2. 상태 관리 및 DOM 참조
+    // ==========================================
+    
+    // 메인 필터 상태
+    let appliedFilter = {
+        ownership: { owned: true, unowned: true },
+        chars: new Set(), 
+        excludeChars: false 
+    };
+    
+    let tempFilter = {
+        ownership: { owned: true, unowned: true },
+        chars: new Set(),
+        excludeChars: false
+    };
+
+    // 모달 내부 뷰 필터 (캐릭터를 찾기 쉽게 해주는 로컬 필터)
+    let modalViewFilter = {
+        elements: new Set(),
+        classes: new Set(), // 클래스 필터 상태 추가
+        rarities: new Set()
+    };
+
+    const panel = document.getElementById('filter-panel');
+    const modal = document.getElementById('char-modal');
+    const filterStatusText = document.getElementById('filter-status');
+    const stickerGrid = document.getElementById('sticker-grid');
+    const charGrid = document.getElementById('char-grid');
+    const chipsContainer = document.getElementById('selected-chips-container');
+    const ownershipBtns = document.querySelectorAll('.btn-toggle');
+    const toggleExclude = document.getElementById('toggle-exclude');
+    const viewFilterBtns = document.querySelectorAll('.filter-trigger'); // 통합 클래스 '.filter-trigger'로 관리
+
+    // ==========================================
+    // 3. 메인 스티커 화면 렌더링 엔진
+    // ==========================================
+    
+    function renderMainStickers() {
+        stickerGrid.innerHTML = '';
+        const fragment = document.createDocumentFragment();
+
+        const filteredStickers = allStickers.filter(sticker => {
+            const showOwned = appliedFilter.ownership.owned;
+            const showUnowned = appliedFilter.ownership.unowned;
+            
+            if (!showOwned && sticker.isOwned) return false;
+            if (!showUnowned && !sticker.isOwned) return false;
+
+            const hasCharSelected = appliedFilter.chars.size > 0;
+            const excludeChars = appliedFilter.excludeChars;
+
+            if (hasCharSelected && excludeChars) {
+                return false; 
+            }
+
+            if (excludeChars) {
+                if (sticker.type === 'character') return false;
+            }
+
+            if (hasCharSelected) {
+                if (sticker.type !== 'character' || !appliedFilter.chars.has(sticker.charId)) {
+                    return false;
+                }
+            }
+
+            return true;
+        });
+
+        if (filteredStickers.length === 0) {
+            const emptyMsg = document.createElement('div');
+            emptyMsg.className = 'empty-message';
+            emptyMsg.innerHTML = '스티커가 없습니다.';
+            fragment.appendChild(emptyMsg);
+        } else {
+            filteredStickers.forEach(s => {
+                const item = document.createElement('div');
+                item.className = `sticker-item ${s.isOwned ? 'owned' : 'locked'}`;
+                item.innerHTML = `${s.text} ${!s.isOwned ? '<span class="locked-icon">🔒</span>' : ''}`;
+                fragment.appendChild(item);
+            });
+        }
+
+        stickerGrid.appendChild(fragment);
+    }
+
+    // ==========================================
+    // 4. 사이드 패널 이벤트 로직
+    // ==========================================
+    
+    document.getElementById('btn-open-filter').addEventListener('click', () => {
+        tempFilter.ownership = { ...appliedFilter.ownership };
+        tempFilter.chars = new Set(appliedFilter.chars);
+        tempFilter.excludeChars = appliedFilter.excludeChars;
+        
+        renderPanelState();
+        panel.classList.add('open');
+    });
+
+    document.getElementById('btn-close-panel').addEventListener('click', () => {
+        panel.classList.remove('open');
+    });
+
+    ownershipBtns.forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            const val = e.target.dataset.val;
+            tempFilter.ownership[val] = !tempFilter.ownership[val];
+            renderPanelState();
+        });
+    });
+
+    toggleExclude.addEventListener('change', (e) => {
+        tempFilter.excludeChars = e.target.checked;
+        if (tempFilter.excludeChars) {
+            tempFilter.chars.clear();
+        }
+        renderPanelState();
+    });
+
+    function renderPanelState() {
+        ownershipBtns.forEach(btn => {
+            if (tempFilter.ownership[btn.dataset.val]) {
+                btn.classList.add('active');
+            } else {
+                btn.classList.remove('active');
+            }
+        });
+
+        toggleExclude.checked = tempFilter.excludeChars;
+
+        const btnSelectChar = document.getElementById('btn-select-char');
+        if (tempFilter.excludeChars) {
+            btnSelectChar.style.opacity = '0.4';
+            btnSelectChar.style.pointerEvents = 'none'; 
+            btnSelectChar.innerHTML = '캐릭터 제외 적용 중 <span class="plus-icon">🚫</span>';
+        } else {
+            btnSelectChar.style.opacity = '1';
+            btnSelectChar.style.pointerEvents = 'auto'; 
+            btnSelectChar.innerHTML = '클릭해 선택 <span class="plus-icon">+</span>';
+        }
+
+        chipsContainer.innerHTML = '';
+        tempFilter.chars.forEach(charId => {
+            const char = characters.find(c => c.id === charId);
+            if(!char) return;
+
+            const chip = document.createElement('div');
+            chip.className = 'char-chip';
+            chip.innerHTML = `
+                <div class="char-chip-left">
+                    <div class="chip-avatar">${char.name}</div>
+                    <span>캐릭터 ${char.name}</span>
+                </div>
+                <button class="btn-remove-chip" data-id="${char.id}">⊗</button>
+            `;
+            chip.querySelector('.btn-remove-chip').addEventListener('click', (e) => {
+                tempFilter.chars.delete(parseInt(e.target.dataset.id));
+                renderPanelState();
+            });
+            chipsContainer.appendChild(chip);
+        });
+    }
+
+    // ==========================================
+    // 5. 모달 및 초기화/적용 로직 (모달 뷰 필터 추가)
+    // ==========================================
+    
+    // 모달 뷰 필터 버튼 클릭 이벤트
+    viewFilterBtns.forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            const type = e.currentTarget.dataset.type; // currentTarget을 사용하여 하위 요소 클릭 방지
+            const val = type === 'rarity' ? parseInt(e.currentTarget.dataset.val) : e.currentTarget.dataset.val;
+
+            if (type === 'element') {
+                if(modalViewFilter.elements.has(val)) modalViewFilter.elements.delete(val);
+                else modalViewFilter.elements.add(val);
+            } else if (type === 'class') {
+                if(modalViewFilter.classes.has(val)) modalViewFilter.classes.delete(val);
+                else modalViewFilter.classes.add(val);
+            } else if (type === 'rarity') {
+                if(modalViewFilter.rarities.has(val)) modalViewFilter.rarities.delete(val);
+                else modalViewFilter.rarities.add(val);
+            }
+
+            e.currentTarget.classList.toggle('active');
+            renderModalGrid();
+        });
+    });
+
+    document.getElementById('btn-select-char').addEventListener('click', () => {
+        renderModalGrid();
+        modal.classList.add('open');
+    });
+
+    document.getElementById('btn-close-modal').addEventListener('click', () => {
+        modal.classList.remove('open');
+    });
+
+    function renderModalGrid() {
+        charGrid.innerHTML = '';
+        const fragment = document.createDocumentFragment();
+
+        // 뷰 필터 적용
+        const filteredChars = characters.filter(char => {
+            if (modalViewFilter.elements.size > 0 && !modalViewFilter.elements.has(char.element)) return false;
+            if (modalViewFilter.classes.size > 0 && !modalViewFilter.classes.has(char.charClass)) return false;
+            if (modalViewFilter.rarities.size > 0 && !modalViewFilter.rarities.has(char.rarity)) return false;
+            return true;
+        });
+
+        if (filteredChars.length === 0) {
+            const emptyMsg = document.createElement('div');
+            emptyMsg.className = 'modal-empty';
+            emptyMsg.innerHTML = '해당 조건의 캐릭터가 없습니다.';
+            fragment.appendChild(emptyMsg);
+        } else {
+            filteredChars.forEach(char => {
+                const isSelected = tempFilter.chars.has(char.id);
+                const item = document.createElement('div');
+                item.className = `char-item ${isSelected ? 'selected' : ''}`;
+                
+                // 캐릭터 아이템에 속성, 클래스, 등급 정보 모두 추가 렌더링
+                item.innerHTML = `
+                    <div class="char-item-avatar">${char.name}</div>
+                    <div class="char-info">
+                        <div class="char-item-name">캐릭터 ${char.name}</div>
+                        <div class="char-item-tags">${char.element} | ${char.charClass} | ${char.rarity}성</div>
+                    </div>
+                    <div class="custom-checkbox">${isSelected ? '✓' : ''}</div>
+                `;
+                
+                item.addEventListener('click', () => {
+                    if (tempFilter.chars.has(char.id)) {
+                        tempFilter.chars.delete(char.id);
+                        item.classList.remove('selected');
+                        item.querySelector('.custom-checkbox').textContent = '';
+                    } else {
+                        tempFilter.chars.add(char.id);
+                        item.classList.add('selected');
+                        item.querySelector('.custom-checkbox').textContent = '✓';
+                    }
+                });
+                fragment.appendChild(item);
+            });
+        }
+        
+        charGrid.appendChild(fragment);
+    }
+
+    // 모달 모두 해제 기능 (선택된 캐릭터만 초기화, 뷰 필터는 유지)
+    document.getElementById('btn-modal-clear').addEventListener('click', () => {
+        tempFilter.chars.clear();
+        renderModalGrid(); 
+    });
+
+    document.getElementById('btn-modal-confirm').addEventListener('click', () => {
+        renderPanelState(); 
+        modal.classList.remove('open');
+    });
+
+    document.getElementById('btn-reset').addEventListener('click', () => {
+        tempFilter.ownership = { owned: true, unowned: true }; 
+        tempFilter.chars.clear();
+        tempFilter.excludeChars = false;
+        renderPanelState();
+    });
+
+    document.getElementById('btn-apply').addEventListener('click', () => {
+        appliedFilter.ownership = { ...tempFilter.ownership };
+        appliedFilter.chars = new Set(tempFilter.chars);
+        appliedFilter.excludeChars = tempFilter.excludeChars;
+        
+        const isFiltering = !appliedFilter.ownership.owned || 
+                            !appliedFilter.ownership.unowned || 
+                            appliedFilter.chars.size > 0 || 
+                            appliedFilter.excludeChars;
+                            
+        if (isFiltering) {
+            filterStatusText.classList.add('active');
+        } else {
+            filterStatusText.classList.remove('active');
+        }
+        
+        panel.classList.remove('open');
+        renderMainStickers();
+    });
+
+    renderMainStickers();
+
+</script>
+</body>
+</html>
